@@ -7,7 +7,7 @@
     "test": "test"
   },
   "scripts": {
-    "build": "mblf wordFactList.mblf out.bf",
+    "build": "./build.sh",
     "test": "node test/wordFactList.js"
   },
   "repository": {
