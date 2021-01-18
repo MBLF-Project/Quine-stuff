@@ -1,0 +1,27 @@
+{
+  "name": "BF",
+  "version": "1.0.0",
+  "description": "So instead of making yet another quine, which many already did before me, with greater conciseness then could be achieved in these few days,, it would be cool to spark new life into an already existing quine.",
+  "main": "index.js",
+  "directories": {
+    "test": "test"
+  },
+  "scripts": {
+    "build": "mblf wordFactList.mblf out.bf",
+    "test": "node test/wordFactList.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/MBLF-Project/Quine-stuff.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/MBLF-Project/Quine-stuff/issues"
+  },
+  "homepage": "https://github.com/MBLF-Project/Quine-stuff#readme",
+  "dependencies": {
+    "mblf-lang": "^1.0.1"
+  }
+}
