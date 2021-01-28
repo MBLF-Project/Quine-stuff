@@ -16,7 +16,7 @@ So:
       - like variable-names of any size and composed of any* characters which is kinda cool for any programming langugage to have
         - then realise no editor has syntax highlighting for this language
 	  - make that first yourself for a IDE you have not touched for years, yay first atom package published to apm!!! 
-	    - stop making the 7 layers of hell again...
+	    - realise the rabbit hole has been entered...
 
 So that is what this project is: a sourcefile containing what seems some oddly but still acceptable formatted text that compiles to the quine.
 
