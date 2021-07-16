@@ -1,0 +1,226 @@
+#!/usr/bin/env node
+
+console.time("Compiled in");
+
+const fs = require("fs");
+const args = process.argv.slice(2, process.argv.length);
+
+if (!args[0] && args[0] !== 0) {
+  console.error("Usage: mblf <input file> <output file>");
+  process.exit(1);
+} else if (!args[1] && args[1] !== 0) {
+  console.error("Error: Please provide an output path.");
+  process.exit(1);
+}
+
+function parseNum(number) {
+  if (typeof number == "string") {
+    if (number.startsWith("0x")) {
+      return parseInt(number.slice(2, number.length), 16);
+    } else if (number.startsWith("\"") && number.endsWith("\"")) {
+      return number.charCodeAt(1);
+    } else {
+      return parseInt(number);
+    }
+  } else {
+    return number;
+  }
+}
+
+let bfOutput = [];
+let variables = [];
+let ptr = 0;
+let prevPtr = 0;
+
+function instruct(instruction, arg) {
+  let pointedVariable;
+  let number;
+  switch (instruction) {
+    case "var":
+      if (variables.indexOf(arg) != -1) {
+        return `${arg} already exists.`;
+      }
+      let emptyAddress = 0;
+      while (!(variables[emptyAddress] === undefined)) {
+        emptyAddress++;
+      }
+      variables[emptyAddress] = arg;
+    break;
+    case "delvar":
+      delete variables[variables.indexOf(arg)];
+    break;
+    case "point":
+      if (bfOutput[bfOutput.length-1] !== undefined &&
+         (bfOutput[bfOutput.length-1].endsWith("<") ||
+          bfOutput[bfOutput.length-1].endsWith(">"))) {
+        bfOutput.pop();
+        ptr = prevPtr;
+      }
+      let variable = variables.indexOf(arg);
+      if (variable == -1) {
+        return `${arg} is not a variable.`;
+      }
+      let distance = variable - ptr;
+      prevPtr = ptr;
+      if (distance > 0) {
+        bfOutput.push(">".repeat(distance));
+      } else if (distance < 0) {
+        bfOutput.push("<".repeat(-distance));
+      }
+      ptr = variable;
+    break;
+    case "pointm":
+      bfOutput.push("<+[-<+]-"); // thank you mixtela
+      ptr = variables.indexOf(arg);
+    break;
+    case "add":
+      number = parseNum(arg);
+      if (Number.isNaN(number)) {
+        return "Failed to parse number.";
+      }
+      bfOutput.push("+".repeat(number));
+    break;
+    case "addb":
+      number = parseNum(arg);
+      if (Number.isNaN(number)) {
+        return "Failed to parse number.";
+      }
+      pointedVariable = variables[ptr];
+      instruct("var", "__temp");
+      instruct("point", "__temp");
+      instruct("add", Math.floor(number / 16));
+      bfOutput.push("[");
+      instruct("sub", "1");
+      instruct("point", pointedVariable);
+      instruct("add", "16");
+      instruct("point", "__temp");
+      bfOutput.push("]");
+      instruct("point", pointedVariable);
+      instruct("add", number - Math.floor(number / 16) * 16);
+      instruct("delvar", "__temp");
+    break;
+    case "addv":
+      pointedVariable = variables[ptr];
+      bfOutput.push("[");
+      instruct("sub", "1");
+      instruct("point", arg);
+      instruct("add", "1");
+      instruct("point", pointedVariable);
+      bfOutput.push("]");
+    break;
+    case "sub":
+      number = parseNum(arg);
+      if (Number.isNaN(number)) {
+        return "Failed to parse number.";
+      }
+      bfOutput.push("-".repeat(number));
+    break;
+    case "subb":
+      number = parseNum(arg);
+      if (Number.isNaN(number)) {
+        return "Failed to parse number.";
+      }
+      pointedVariable = variables[ptr];
+      instruct("var", "__temp");
+      instruct("point", "__temp");
+      instruct("add", Math.floor(number / 10));
+      bfOutput.push("[");
+      instruct("sub", "1");
+      instruct("point", pointedVariable);
+      instruct("sub", "10");
+      instruct("point", "__temp");
+      bfOutput.push("]");
+      instruct("point", pointedVariable);
+      instruct("sub", number - Math.floor(number / 10) * 10);
+      instruct("delvar", "__temp");
+    break;
+    case "subv":
+      pointedVariable = variables[ptr];
+      bfOutput.push("[");
+      instruct("sub", "1");
+      instruct("point", arg);
+      instruct("sub", "1");
+      instruct("point", pointedVariable);
+      bfOutput.push("]");
+    break;
+    case "copy":
+      pointedVariable = variables[ptr];
+      instruct("var", "__temp");
+      bfOutput.push("[");
+      instruct("sub", "1");
+      instruct("point", arg);
+      instruct("add", "1");
+      instruct("point", "__temp");
+      instruct("add", "1");
+      instruct("point", pointedVariable);
+      bfOutput.push("]");
+      instruct("point", "__temp");
+      bfOutput.push("[");
+      instruct("sub", "1");
+      instruct("point", pointedVariable);
+      instruct("add", "1");
+      instruct("point", "__temp");
+      bfOutput.push("]");
+      instruct("delvar", "__temp");
+    break;
+    case "setz":
+      bfOutput.push("[-]");
+    break;
+    case "getchr":
+      bfOutput.push(",");
+    break;
+    case "print":
+      bfOutput.push(".");
+    break;
+    case "[":
+      bfOutput.push("[");
+    break;
+    case "]":
+      bfOutput.push("]");
+    break;
+    default:
+      if (instruction !== "") {
+        return `${instruction} is not an instruction.`
+      }
+    break;
+  }
+}
+
+function runMblf(inputFile) {
+  let file;
+  try {
+    file = fs.readFileSync(inputFile, "utf8")
+  } catch (e) {
+    console.error(`Error: ${e.message}`);
+    process.exit(1);
+  }
+  return file
+    .replace(/\r/gm, "")
+    .split("\n")
+    .forEach((item, line) => {
+      let statement = item.split(";;")[0].trim().split(" ");
+      if (statement[0] == "#include") {
+        try {
+          runMblf(item.split("\"")[1]);
+        } catch (e) {
+          if (e.name == "RangeError" && e.message == "Maximum call stack size exceeded") {
+            console.error(`[${inputFile}] Error in line ${line+1}: Call stack size exceeded. Check for cyclic dependencies.`);
+            process.exit(1);
+          } else {
+            throw e;
+          }
+        }
+      } else {
+        let instructAttempt = instruct(statement[0], statement.slice(1, statement.length).join(" "));
+        if (instructAttempt !== undefined) {
+          console.error(`[${inputFile}] Error in line ${line+1}: ${instructAttempt}`);
+          process.exit(1);
+        }
+      }
+    });
+}
+
+runMblf(args[0]);
+fs.writeFileSync(args[1], bfOutput.join(""));
+
+console.timeEnd("Compiled in");
